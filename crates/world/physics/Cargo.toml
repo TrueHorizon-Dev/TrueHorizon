@@ -14,3 +14,6 @@ planet-coords = { workspace = true }
 block-schema = { workspace = true }
 world-contracts = { workspace = true }
 glam = { workspace = true }
+
+[lints]
+workspace = true

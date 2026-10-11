@@ -15,3 +15,6 @@ block-schema = { workspace = true }
 world-contracts = { workspace = true }
 glam = { workspace = true }
 rayon = { workspace = true }
+
+[lints]
+workspace = true

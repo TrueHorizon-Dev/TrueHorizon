@@ -13,3 +13,6 @@ foundation = { workspace = true }
 planet-coords = { workspace = true }
 protocol = { workspace = true }
 crossbeam-channel = { workspace = true }
+
+[lints]
+workspace = true

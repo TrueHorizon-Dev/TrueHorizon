@@ -17,3 +17,6 @@ world-contracts = { workspace = true }
 bitvec = { workspace = true }
 bytemuck = { workspace = true }
 rayon = { workspace = true }
+
+[lints]
+workspace = true

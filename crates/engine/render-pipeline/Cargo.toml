@@ -16,3 +16,6 @@ planet-coords = { workspace = true }
 glam = { workspace = true }
 bytemuck = { workspace = true }
 rayon = { workspace = true }
+
+[lints]
+workspace = true

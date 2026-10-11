@@ -16,3 +16,6 @@ world-contracts = { workspace = true }
 storage = { workspace = true }
 protocol = { workspace = true }
 rayon = { workspace = true }
+
+[lints]
+workspace = true

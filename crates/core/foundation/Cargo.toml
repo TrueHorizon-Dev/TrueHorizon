@@ -10,3 +10,6 @@ description = "TrueHorizon workspace member: foundation"
 # 成员只做 opt-in 声明，禁止在此处直接写死版本号。
 [dependencies]
 # 暂无第三方依赖：核心层只依赖 std
+
+[lints]
+workspace = true

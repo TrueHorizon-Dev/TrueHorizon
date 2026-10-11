@@ -16,3 +16,6 @@ storage = { workspace = true }
 rkyv = { workspace = true }
 serde = { workspace = true }
 bytemuck = { workspace = true }
+
+[lints]
+workspace = true

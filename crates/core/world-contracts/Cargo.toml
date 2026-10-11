@@ -12,3 +12,6 @@ description = "TrueHorizon workspace member: world-contracts"
 glam = { workspace = true }
 planet-coords = { workspace = true }
 block-schema = { workspace = true }
+
+[lints]
+workspace = true

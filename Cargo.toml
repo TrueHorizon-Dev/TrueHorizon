@@ -1,10 +1,6 @@
 [workspace]
 resolver = "2"
-members = [
-    "apps/*",
-    "crates/*/*",
-    "tests/*",
-]
+members = ["apps/*", "crates/*/*", "tests/*"]
 
 [workspace.package]
 version = "0.1.0"
@@ -29,7 +25,9 @@ rkyv = { version = "0.8" }
 # 4. 图形硬件层 (Vulkan 1.3 现代基底)
 ash = "0.38"
 ash-window = "0.13"
-gpu-allocator = { version = "0.27", default-features = false, features = ["vulkan"] }
+gpu-allocator = { version = "0.27", default-features = false, features = [
+    "vulkan",
+] }
 winit = "0.30"
 # 与 ash-window 对接所需的窗口/显示句柄类型（winit 0.30 也基于它）。
 raw-window-handle = "0.6"
@@ -66,14 +64,83 @@ protocol = { path = "crates/net/protocol" }
 client-sync = { path = "crates/net/client-sync" }
 server-authority = { path = "crates/net/server-authority" }
 
+# =========================================================================
+# 编译 Profile 调度
+# =========================================================================
+
+# Release：兼顾极致性能与现实编译开销
+[profile.release]
+opt-level = 3
+# 巨型工程日常发布用 thin，兼顾 95% 的跨 crate 内联性能与合理的链接时间
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+strip = "symbols"
+incremental = false
+
+# Dev：必须开启 opt-level = 1，否则复杂的体素与地貌数学迭代奇慢无比
 [profile.dev]
 opt-level = 1
 
 [profile.dev.package."*"]
+# 对第三方库（Ash/Glam/Rayon/Wasmtime）全速优化
 opt-level = 3
 
-[profile.release]
-opt-level = 3
-lto = "thin"
-codegen-units = 1
-panic = "abort"
+# =========================================================================
+# Workspace 质量与 Lint 门禁（引擎级平衡）
+# =========================================================================
+# 注意：`[workspace.lints]` 本身不会自动生效，每个成员必须在自己的
+# Cargo.toml 中写 `[lints] workspace = true`，本工作区 21 个成员已全部 opt-in。
+
+[workspace.lints.rust]
+# 严禁全局 forbid unsafe！引擎核心层必须封装原生硬件
+# 具体的 unsafe 规范通过架构审查和各 crate 内局部控制
+rust_2018_idioms = { level = "deny", priority = -1 }
+rust_2024_compatibility = { level = "deny", priority = -1 }
+unreachable_pub = "deny"
+unused_qualifications = "deny"
+unused_lifetimes = "deny"
+trivial_casts = "deny"
+trivial_numeric_casts = "deny"
+unit_bindings = "deny"
+missing_abi = "deny"
+
+[workspace.lints.clippy]
+# 基础质量底线
+all = { level = "warn", priority = -1 }
+
+# 核心代码卫生控制（禁止随意污染 stdout 与遗留调试代码）
+dbg_macro = "deny"
+print_stdout = "warn"
+print_stderr = "warn"
+
+# 并发与异步安全
+await_holding_lock = "deny"
+large_futures = "deny"
+
+# 结构与所有权优化
+needless_pass_by_ref_mut = "deny"
+use_self = "warn"
+redundant_clone = "warn"
+
+# 针对游戏引擎特性特批【豁免】的规则：
+# 1. 允许惯用的尾部表达式，不强制 C 风格的显式 return
+needless_return = "warn"
+# 2. 豁免数值强制转换警告：体素索引与图形浮点换算频率极高
+cast_precision_loss = "allow"
+cast_possible_truncation = "allow"
+cast_sign_loss = "allow"
+# 3. 豁免枚举体积差异：保护连续内存布局，防止无脑 Box 破坏 CPU Cache
+variant_size_differences = "allow"
+# 4. 豁免单次调用函数警告（引擎中有大量为了架构可读性抽出的单次子函数）
+single_call_fn = "allow"
+module_name_repetitions = "allow"
+
+# =========================================================================
+# 文档门槛（仅校验有效性，不强制在开发初期为每一个私有项写文档）
+# =========================================================================
+
+[workspace.lints.rustdoc]
+broken_intra_doc_links = "deny"
+invalid_codeblock_attributes = "deny"
+invalid_rust_codeblocks = "deny"

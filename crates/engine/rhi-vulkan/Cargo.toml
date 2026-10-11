@@ -14,3 +14,6 @@ ash = { workspace = true }
 ash-window = { workspace = true }
 gpu-allocator = { workspace = true }
 raw-window-handle = { workspace = true }
+
+[lints]
+workspace = true

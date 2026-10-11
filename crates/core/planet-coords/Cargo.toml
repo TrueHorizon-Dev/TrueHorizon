@@ -11,3 +11,6 @@ description = "TrueHorizon workspace member: planet-coords"
 [dependencies]
 glam = { workspace = true }
 bytemuck = { workspace = true }
+
+[lints]
+workspace = true

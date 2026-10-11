@@ -21,3 +21,6 @@ server-authority = { workspace = true }
 crossbeam-channel = { workspace = true }
 renet = { workspace = true }
 renet_netcode = { workspace = true }
+
+[lints]
+workspace = true

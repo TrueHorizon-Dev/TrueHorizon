@@ -13,3 +13,6 @@ planet-coords = { workspace = true }
 block-schema = { workspace = true }
 glam = { workspace = true }
 bytemuck = { workspace = true }
+
+[lints]
+workspace = true
