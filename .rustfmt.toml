@@ -1,0 +1,50 @@
+# 基础格式
+edition = "2024"
+max_width = 100
+tab_spaces = 4
+hard_tabs = false
+use_small_heuristics = "Default"
+newline_style = "Unix"
+indent_style = "Block"
+
+# 导入排序与分组
+imports_granularity = "Crate"
+group_imports = "StdExternalCrate"
+reorder_imports = true
+reorder_modules = true
+
+# 注释格式化
+wrap_comments = true
+comment_width = 100
+normalize_comments = true
+normalize_doc_attributes = true
+format_code_in_doc_comments = true
+
+# 字面量与宏
+hex_literal_case = "Upper"
+format_macro_matchers = true
+format_macro_bodies = true
+condense_wildcard_suffixes = true
+
+# 表达式与控制流
+match_block_trailing_comma = true
+trailing_comma = "Vertical"
+trailing_semicolon = true
+use_field_init_shorthand = true
+use_try_shorthand = true
+fn_call_width = 60
+fn_single_line = false
+single_line_if_else_max_width = 50
+where_single_line = false
+
+# 类型与结构对齐
+struct_field_align_threshold = 20
+enum_discrim_align_threshold = 0
+inline_attribute_width = 0
+empty_item_single_line = true
+
+# 空白与大括号
+blank_lines_lower_bound = 0
+blank_lines_upper_bound = 1
+brace_style = "SameLineWhere"
+control_brace_style = "AlwaysSameLine"
