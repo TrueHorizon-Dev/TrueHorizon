@@ -1,0 +1,69 @@
+[workspace]
+resolver = "2"
+members = [
+    "apps/*",
+    "crates/*/*",
+    "tests/*",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.80"
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+# 第三方数学与数据对齐
+glam = { version = "0.28", features = ["scalar-math"] }
+bytemuck = { version = "1.18", features = ["derive"] }
+bitvec = "1.0"
+
+# 并发与异步
+rayon = "1.10"
+crossbeam-channel = "0.5"
+
+# 序列化
+serde = { version = "1.0", features = ["derive"] }
+rkyv = { version = "0.7", features = ["validation"] }
+
+# 图形硬件 (仅 engine/ 依赖)
+ash = "0.38"
+gpu-allocator = "0.26"
+winit = "0.30"
+
+# 插件沙箱 (仅 world/simulation 依赖)
+wasmtime = { version = "24.0", default-features = false, features = ["cranelift", "runtime"] }
+
+# 内部 crate 映射路径
+foundation = { path = "crates/core/foundation" }
+planet-coords = { path = "crates/core/planet-coords" }
+block-schema = { path = "crates/core/block-schema" }
+world-contracts = { path = "crates/core/world-contracts" }
+render-contracts = { path = "crates/core/render-contracts" }
+
+rhi-vulkan = { path = "crates/engine/rhi-vulkan" }
+render-pipeline = { path = "crates/engine/render-pipeline" }
+world-meshing = { path = "crates/engine/world-meshing" }
+
+geology = { path = "crates/world/geology" }
+storage = { path = "crates/world/storage" }
+physics = { path = "crates/world/physics" }
+persistence = { path = "crates/world/persistence" }
+simulation = { path = "crates/world/simulation" }
+streaming = { path = "crates/world/streaming" }
+
+protocol = { path = "crates/net/protocol" }
+client-sync = { path = "crates/net/client-sync" }
+server-authority = { path = "crates/net/server-authority" }
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+panic = "abort"

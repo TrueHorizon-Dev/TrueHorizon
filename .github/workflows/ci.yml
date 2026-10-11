@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  build-and-test:
+    name: 构建 / 测试 / 诊断
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装图形与 Vulkan 开发依赖
+        # winit 需要窗口系统头文件，ash（linked 模式）需要 Vulkan loader 才能在链接期解析符号。
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libvulkan-dev \
+            libwayland-dev libxkbcommon-dev libx11-dev libxrandr-dev libxi-dev libxcursor-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: 格式检查
+        run: cargo fmt --all --check
+
+      - name: Clippy（所有目标）
+        run: cargo clippy --workspace --all-targets
+
+      - name: 构建
+        run: cargo build --workspace --all-targets
+
+      - name: 单元测试 + 端到端测试
+        run: cargo test --workspace
+
+      - name: 离线诊断（行星摘要 + 方块注册表校验）
+        run: cargo run -p world-tool -- diagnose --seed 42
+
+      - name: 无头服务器冒烟（400 Tick）
+        run: cargo run -p dedicated-server -- --ticks 400 --port 27100
+
+  worldgen-bake:
+    name: 地质烘焙产物可复现
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: 烘焙两次并比对哈希
+        # 程序化生成必须是确定性的：同种子两次烘焙的产物必须逐字节相同。
+        run: |
+          cargo run -p world-tool -- bake --seed 42 --chunks 2 --out bake-a
+          cargo run -p world-tool -- bake --seed 42 --chunks 2 --out bake-b
+          sha256sum bake-a/*.wal bake-b/*.wal
+          diff <(sha256sum bake-a/*.wal | awk '{print $1}') \
+               <(sha256sum bake-b/*.wal | awk '{print $1}')

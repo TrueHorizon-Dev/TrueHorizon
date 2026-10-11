@@ -1,0 +1,24 @@
+# Rust 构建产物
+/target
+**/*.rs.bk
+
+# 编辑器与 IDE
+.vscode/
+.idea/
+*.swp
+*.iml
+
+# 世界烘焙与运行时产生的大文件（不入库，走 world-tool 重新生成或对象存储）
+*.worldbin
+*.walsnap
+/worlds/
+/bake-out/
+
+# 性能与诊断转储
+/traces/
+*.trace.json
+*.perfetto.json
+
+# OS
+Thumbs.db
+.DS_Store

@@ -1,0 +1,20 @@
+# 行尾统一为 LF：仓库内一致，避免 Windows/macOS/Linux 之间的整文件 diff 噪音。
+# 工作副本同样使用 LF（eol=lf），因此编辑器必须按 LF 保存源码。
+* text=auto eol=lf
+
+# 源码与配置显式声明为文本
+*.rs   text
+*.toml text
+*.md   text
+*.yml  text
+*.json text
+
+# 二进制产物不做任何行尾转换
+*.png     binary
+*.jpg     binary
+*.jpeg    binary
+*.ktx2    binary
+*.wasm    binary
+*.worldbin binary
+*.wal     binary
+*.snap    binary

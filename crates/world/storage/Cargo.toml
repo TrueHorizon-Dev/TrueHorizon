@@ -1,0 +1,19 @@
+[package]
+name = "storage"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "TrueHorizon workspace member: storage"
+
+# 依赖统一在根 Cargo.toml 的 [workspace.dependencies] 中锁定版本与路径，
+# 成员只做 opt-in 声明，禁止在此处直接写死版本号。
+[dependencies]
+glam = { workspace = true }
+foundation = { workspace = true }
+planet-coords = { workspace = true }
+block-schema = { workspace = true }
+world-contracts = { workspace = true }
+bitvec = { workspace = true }
+bytemuck = { workspace = true }
+rayon = { workspace = true }

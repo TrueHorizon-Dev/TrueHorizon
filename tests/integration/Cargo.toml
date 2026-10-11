@@ -1,0 +1,28 @@
+[package]
+name = "integration"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "TrueHorizon 无图形界面端到端测试（世界生成 + 多人联机）"
+publish = false
+
+# 说明：本 crate 是**纯测试成员**（`publish = false`），永远不会进入发布产物。
+# 因此被测 crate 直接挂在 [dependencies] 上：`src/lib.rs` 里的共享装配代码需要它们，
+# 而 dev-dependencies 对 lib target 不可见（只对 tests/ 可见）。
+[dependencies]
+foundation = { workspace = true }
+planet-coords = { workspace = true }
+block-schema = { workspace = true }
+world-contracts = { workspace = true }
+geology = { workspace = true }
+storage = { workspace = true }
+persistence = { workspace = true }
+simulation = { workspace = true }
+streaming = { workspace = true }
+world-meshing = { workspace = true }
+protocol = { workspace = true }
+client-sync = { workspace = true }
+server-authority = { workspace = true }
+glam = { workspace = true }
+rayon = { workspace = true }
