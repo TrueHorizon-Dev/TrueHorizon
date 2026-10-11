@@ -1,16 +1,12 @@
 [workspace]
 resolver = "2"
-members = [
-    "apps/*",
-    "crates/*/*",
-    "tests/*",
-]
+members = ["apps/*", "crates/*/*", "tests/*"]
 
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.80"
-license = "MIT OR Apache-2.0"
+license = "AGPL-3.0-or-later"
 
 [workspace.dependencies]
 # 第三方数学与数据对齐
@@ -32,7 +28,10 @@ gpu-allocator = "0.26"
 winit = "0.30"
 
 # 插件沙箱 (仅 world/simulation 依赖)
-wasmtime = { version = "24.0", default-features = false, features = ["cranelift", "runtime"] }
+wasmtime = { version = "24.0", default-features = false, features = [
+    "cranelift",
+    "runtime",
+] }
 
 # 内部 crate 映射路径
 foundation = { path = "crates/core/foundation" }
