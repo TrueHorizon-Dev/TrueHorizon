@@ -11,4 +11,6 @@ description = "TrueHorizon workspace member: rhi-vulkan"
 [dependencies]
 foundation = { workspace = true }
 ash = { workspace = true }
+ash-window = { workspace = true }
 gpu-allocator = { workspace = true }
+raw-window-handle = { workspace = true }

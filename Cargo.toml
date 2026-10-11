@@ -1,6 +1,10 @@
 [workspace]
 resolver = "2"
-members = ["apps/*", "crates/*/*", "tests/*"]
+members = [
+    "apps/*",
+    "crates/*/*",
+    "tests/*",
+]
 
 [workspace.package]
 version = "0.1.0"
@@ -9,31 +13,38 @@ rust-version = "1.80"
 license = "AGPL-3.0-or-later"
 
 [workspace.dependencies]
-# 第三方数学与数据对齐
-glam = { version = "0.28", features = ["scalar-math"] }
+# 1. 数学库（移除 scalar-math，恢复极致 SIMD）
+glam = { version = "0.28" }
 bytemuck = { version = "1.18", features = ["derive"] }
 bitvec = "1.0"
 
-# 并发与异步
+# 2. 并发与异步
 rayon = "1.10"
 crossbeam-channel = "0.5"
 
-# 序列化
+# 3. 序列化（直接对齐 rkyv 0.8 与标准 serde）
 serde = { version = "1.0", features = ["derive"] }
-rkyv = { version = "0.7", features = ["validation"] }
+rkyv = { version = "0.8" }
 
-# 图形硬件 (仅 engine/ 依赖)
+# 4. 图形硬件层 (Vulkan 1.3 现代基底)
 ash = "0.38"
-gpu-allocator = "0.26"
+ash-window = "0.13"
+gpu-allocator = { version = "0.27", default-features = false, features = ["vulkan"] }
 winit = "0.30"
+# 与 ash-window 对接所需的窗口/显示句柄类型（winit 0.30 也基于它）。
+raw-window-handle = "0.6"
 
-# 插件沙箱 (仅 world/simulation 依赖)
+# 5. 专为游戏设计的可靠/不可靠 UDP 网络传输协议栈
+renet = "2.0"
+renet_netcode = "2.0"
+
+# 6. Wasm 运行时 (仅 world/simulation 依赖)
 wasmtime = { version = "24.0", default-features = false, features = [
     "cranelift",
     "runtime",
 ] }
 
-# 内部 crate 映射路径
+# 内部 Crate 映射
 foundation = { path = "crates/core/foundation" }
 planet-coords = { path = "crates/core/planet-coords" }
 block-schema = { path = "crates/core/block-schema" }

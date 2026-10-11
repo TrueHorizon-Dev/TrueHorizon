@@ -80,11 +80,11 @@ impl core::fmt::Display for MeshError {
         match self {
             Self::VolumeSizeMismatch { expected, actual } => {
                 write!(f, "体素缓冲长度不匹配：期望 {expected}，实际 {actual}")
-            }
+            },
             Self::EdgeMustBePositive => write!(f, "Chunk 边长必须为正数"),
             Self::ChunkEdgeMismatch { declared, derived } => {
                 write!(f, "Chunk 边长不一致：声明 {declared}，缓冲推出 {derived}")
-            }
+            },
         }
     }
 }

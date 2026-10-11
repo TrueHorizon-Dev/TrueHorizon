@@ -138,15 +138,15 @@ pub fn raycast<W: WorldView + ?Sized>(world: &W, ray: Ray, max_distance_m: f64) 
             0 => {
                 voxel.x += step[0];
                 normal = [(-step[0]) as i32, 0, 0];
-            }
+            },
             1 => {
                 voxel.y += step[1];
                 normal = [0, (-step[1]) as i32, 0];
-            }
+            },
             _ => {
                 voxel.z += step[2];
                 normal = [0, 0, (-step[2]) as i32];
-            }
+            },
         }
         t_max[axis] += t_delta[axis];
 

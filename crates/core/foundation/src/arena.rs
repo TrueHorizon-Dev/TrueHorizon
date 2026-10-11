@@ -97,7 +97,7 @@ impl<T> Arena<T> {
         match self.slots.get(handle.index() as usize) {
             Some(Slot::Occupied { generation, value }) if *generation == handle.generation() => {
                 Some(value)
-            }
+            },
             _ => None,
         }
     }
@@ -108,7 +108,7 @@ impl<T> Arena<T> {
         match self.slots.get_mut(handle.index() as usize) {
             Some(Slot::Occupied { generation, value }) if *generation == handle.generation() => {
                 Some(value)
-            }
+            },
             _ => None,
         }
     }
@@ -150,7 +150,7 @@ impl<T> Arena<T> {
             .filter_map(|(i, slot)| match slot {
                 Slot::Occupied { generation, value } => {
                     Some((Handle::new(i as u32, *generation), value))
-                }
+                },
                 Slot::Vacant { .. } => None,
             })
     }
@@ -163,7 +163,7 @@ impl<T> Arena<T> {
             .filter_map(|(i, slot)| match slot {
                 Slot::Occupied { generation, value } => {
                     Some((Handle::new(i as u32, *generation), value))
-                }
+                },
                 Slot::Vacant { .. } => None,
             })
     }

@@ -123,29 +123,30 @@ apps/* 只依赖 crates/*，crates/* 之间只允许沿箭头方向依赖。
 * 确定性噪声、球面 Voronoi 板块、连续地层剖面；
 * 32³ Chunk 调色板压缩 + 占用位图、Morton 编码、Chunk 池与内存世界视图；
 * 贪心网格合并 + 顶点打包 + rayon 并行任务池；
-* 差量表、WAL 往返、撕裂写恢复；
+* 差量表、WAL 往返、撕裂写恢复、`rkyv` 0.8 零拷贝 Chunk 快照（归档校验、字节级可复现）；
 * 固定 Tick 时钟、规则调度与冲突检测、Wasm 模块编译与权限模型；
 * 四叉树 LOD 选择、近景 Chunk 规划、惰性任务队列；
-* 速度/瞬移权威校验、曲率遮挡 AoI、预测缓冲、快照插值与和解。
+* 速度/瞬移权威校验、曲率遮挡 AoI、预测缓冲、快照插值与和解；
+* 真实 Vulkan：loader 加载 → 实例（扩展/层校验）→ 物理设备确定性评分 → 逻辑设备与队列
+  → `ash-window` 表面 → `gpu-allocator` 显存分配（无 GPU 时全部降级为可诊断错误）；
+* `renet` 2.0 + netcode 传输（不可靠输入 / 可靠差量 / 可靠控制通道）与手写小端线格式编解码，
+  真实 UDP 回环端到端测试覆盖握手、输入上行、快照下行、协议号不匹配与畸形负载。
 
 待实现（已定位的 `TODO`）：
 
 | 位置 | 内容 |
 |------|------|
-| `rhi-vulkan` | 实例/设备创建、交换链、bindless 表实装、mesh shader 管线 |
+| `rhi-vulkan` | 交换链与呈现、bindless 表实装、mesh shader 管线 |
 | `render-pipeline` | 真实命令录制、实例缓冲环形上传、Hi-Z 遮挡剔除 |
 | `geology` | 水文 DAG 侵蚀、沉积物输运、火山口与陨石坑 |
 | `streaming` | 按列缓存地表高程、GPU 侧 LOD 反馈 |
 | `simulation` | Mod 实例化、燃料计量、宿主函数白名单 |
-| `net` | 报文编解码（bincode/postcard）、丢包与乱序测试、房间管理 |
-| `apps/client` | 输入 → `ClientInput` 映射、真实呈现 |
+| `net` | 房间/大厅管理、丢包与乱序注入测试、差量压实的调度策略 |
+| `apps/client` | 键盘 → `ClientInput` 映射、快照接进 `client-sync` 预测闭环、真实呈现 |
 
 ## 待决事项
 
-* **许可证冲突（需要拍板）**：仓库根目录的 `LICENSE` 是 **AGPL-3.0**，
-  而 `Cargo.toml` 里声明的是 `MIT OR Apache-2.0`。二者不可并存：
-  要么把 `[workspace.package] license` 改为 `AGPL-3.0-or-later`，
-  要么替换 LICENSE 并补上 `LICENSE-MIT` / `LICENSE-APACHE`。
-  在决定之前，**没有**添加 MIT/Apache 许可证文件，以免产生相互矛盾的授权声明。
+* **许可证（已定）**：仓库 `LICENSE` 是 **AGPL-3.0**，`[workspace.package] license`
+  已改为 `AGPL-3.0-or-later` 与之保持一致；未添加 MIT/Apache 许可证文件。
 * 行星半径与体素边长目前是常量（1 m / 6 371 km）；若要做多行星，需把它们
   收敛为启动期配置并贯穿 `planet-coords`。

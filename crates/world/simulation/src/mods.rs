@@ -81,7 +81,7 @@ impl core::fmt::Display for ModError {
         match self {
             Self::AbiMismatch { expected, found } => {
                 write!(f, "Mod ABI 不匹配：宿主 {expected}，Mod {found}")
-            }
+            },
             Self::Compile(message) => write!(f, "Mod 编译失败: {message}"),
             Self::Denied { capability } => write!(f, "Mod 未获得权限: {capability}"),
         }

@@ -207,7 +207,7 @@ impl core::fmt::Display for RegistryError {
             Self::DuplicateId(id) => write!(f, "方块 ID {} 重复注册", id.raw()),
             Self::IdGap { expected, actual } => {
                 write!(f, "方块 ID 出现空洞：期望 {expected}，实际 {actual}")
-            }
+            },
             Self::ReservedId(id) => write!(f, "方块 ID {} 为保留值", id.raw()),
         }
     }

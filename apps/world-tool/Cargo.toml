@@ -18,3 +18,4 @@ geology = { workspace = true }
 storage = { workspace = true }
 persistence = { workspace = true }
 streaming = { workspace = true }
+rhi-vulkan = { workspace = true }

@@ -23,4 +23,7 @@ storage = { workspace = true }
 streaming = { workspace = true }
 protocol = { workspace = true }
 client-sync = { workspace = true }
+server-authority = { workspace = true }
 winit = { workspace = true }
+renet = { workspace = true }
+renet_netcode = { workspace = true }

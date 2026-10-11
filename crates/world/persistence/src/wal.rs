@@ -1,14 +1,13 @@
 //! 写时复制日志（Write-Ahead Log）。
 //!
-//! 设计取舍：**手写长度前缀的二进制帧，而不是用 `rkyv`/`serde` 的派生格式**。
-//! 理由：
+//! 设计取舍：**帧头手写、负载分层**。
 //!
-//! * WAL 是崩溃恢复的最后一道防线，格式必须能被 10 年后的代码读懂，
-//!   并且能用一个独立的小工具（`world-tool diagnose`）在不链接引擎的前提下解析；
-//! * 定长字段 + 显式小端，天然支持「跳过整条记录」与部分恢复；
-//! * 长度前缀使**撕裂写**（进程被杀时写了一半）可被检测为截断错误，而不是解析出垃圾。
-//!
-//! `rkyv` 仍然会在「整块 Chunk 快照」的紧凑序列化上使用（见路线图）。
+//! * 帧头（`kind | len`）手写：定长字段 + 显式小端，天然支持「跳过整条记录」与部分恢复；
+//!   长度前缀使**撕裂写**（进程被杀时写了一半）可被检测为截断错误，而不是解析出垃圾；
+//! * 差量负载手写：4 字节/条的紧凑布局，格式能被 10 年后的代码读懂，
+//!   且 `world-tool diagnose` 不链接引擎也能解析；
+//! * 快照负载用 `rkyv` 0.8 归档：整块 Chunk 是「读多写少」的数据，
+//!   归档支持零拷贝读取与字节级校验（见 [`crate::snapshot`]）。
 //!
 //! 帧格式：
 //!
@@ -21,12 +20,14 @@
 //!
 //! * `Delta`：`coord(3×i64) | base_version: u32 | count: u32 | count × (index: u16, block: u16)`
 //! * `Checkpoint`：`tick: u64`
+//! * `Snapshot`：`rkyv` 归档字节（`ChunkSnapshot`）
 
 use std::io::{Read, Write};
 
 use world_contracts::ChunkCoord;
 
 use crate::delta::{ChunkDelta, VoxelDelta};
+use crate::snapshot::ChunkSnapshot;
 use crate::PersistError;
 
 /// WAL 文件魔数与版本号（改格式必须改这里）。
@@ -37,6 +38,7 @@ pub const MAX_RECORD_BYTES: u32 = 16 * 1024 * 1024;
 
 const KIND_DELTA: u8 = 1;
 const KIND_CHECKPOINT: u8 = 2;
+const KIND_SNAPSHOT: u8 = 3;
 
 /// WAL 记录。
 #[derive(Clone, Debug, PartialEq)]
@@ -48,12 +50,14 @@ pub enum WalRecord {
         /// 该 checkpoint 覆盖到的 tick。
         tick: u64,
     },
+    /// 整块 Chunk 快照（`rkyv` 归档）：压实后的稠密基准。
+    Snapshot(ChunkSnapshot),
 }
 
 impl WalRecord {
     /// 编码为负载字节。
-    pub fn encode(&self) -> Vec<u8> {
-        match self {
+    pub fn encode(&self) -> Result<Vec<u8>, PersistError> {
+        Ok(match self {
             Self::Delta(delta) => {
                 let mut out = Vec::with_capacity(24 + 8 + delta.len() * 4);
                 out.extend_from_slice(&delta.coord.x.to_le_bytes());
@@ -66,9 +70,10 @@ impl WalRecord {
                     out.extend_from_slice(&edit.block.to_le_bytes());
                 }
                 out
-            }
+            },
             Self::Checkpoint { tick } => tick.to_le_bytes().to_vec(),
-        }
+            Self::Snapshot(snapshot) => snapshot.archive()?.to_vec(),
+        })
     }
 
     /// 记录类型标签。
@@ -76,6 +81,7 @@ impl WalRecord {
         match self {
             Self::Delta(_) => KIND_DELTA,
             Self::Checkpoint { .. } => KIND_CHECKPOINT,
+            Self::Snapshot(_) => KIND_SNAPSHOT,
         }
     }
 
@@ -119,7 +125,7 @@ impl WalRecord {
                     base_version,
                     edits,
                 }))
-            }
+            },
             KIND_CHECKPOINT => {
                 if payload.len() != 8 {
                     return Err(PersistError::Malformed(
@@ -131,7 +137,8 @@ impl WalRecord {
                 Ok(Self::Checkpoint {
                     tick: u64::from_le_bytes(bytes),
                 })
-            }
+            },
+            KIND_SNAPSHOT => ChunkSnapshot::from_archive(payload).map(Self::Snapshot),
             other => Err(PersistError::UnknownRecordKind(other)),
         }
     }
@@ -160,7 +167,7 @@ impl<W: Write> WalWriter<W> {
 
     /// 追加一条记录（含长度前缀）。
     pub fn append(&mut self, record: &WalRecord) -> Result<(), PersistError> {
-        let payload = record.encode();
+        let payload = record.encode()?;
         if payload.len() as u64 > u64::from(MAX_RECORD_BYTES) {
             return Err(PersistError::Malformed(format!(
                 "记录负载 {} 字节超出上限 {MAX_RECORD_BYTES}",
@@ -244,7 +251,7 @@ impl<R: Read> WalReader<R> {
     pub fn next_record(&mut self) -> Result<Option<WalRecord>, PersistError> {
         let mut kind = [0u8; 1];
         match self.inner.read_exact(&mut kind) {
-            Ok(()) => {}
+            Ok(()) => {},
             Err(error) if error.kind() == std::io::ErrorKind::UnexpectedEof => return Ok(None),
             Err(error) => return Err(PersistError::Io(error)),
         }
@@ -297,8 +304,10 @@ impl<R: Read> WalReader<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::snapshot::ChunkSnapshot;
     use block_schema::BlockId;
     use std::io::Cursor;
+    use storage::Chunk;
 
     fn sample_delta() -> ChunkDelta {
         let mut delta = ChunkDelta::new(ChunkCoord::new(-3, 7, 0), 42);
@@ -388,8 +397,60 @@ mod tests {
     #[test]
     fn empty_delta_round_trips() {
         let record = WalRecord::Delta(ChunkDelta::new(ChunkCoord::default(), 0));
-        let payload = record.encode();
+        let payload = record.encode().unwrap();
         assert_eq!(payload.len(), 32, "空差量只有头部");
         assert_eq!(WalRecord::decode(KIND_DELTA, &payload).unwrap(), record);
+    }
+
+    #[test]
+    fn snapshot_record_round_trips_through_the_wal() {
+        let mut chunk = Chunk::new_empty(ChunkCoord::new(4, -1, 2));
+        chunk.set(3, 4, 5, BlockId::new(7)).unwrap();
+        chunk.set(31, 31, 31, BlockId::new(9)).unwrap();
+        let snapshot = ChunkSnapshot::from_chunk(&chunk);
+
+        let mut buffer = Vec::new();
+        {
+            let mut writer = WalWriter::new(&mut buffer).unwrap();
+            writer
+                .append(&WalRecord::Snapshot(snapshot.clone()))
+                .unwrap();
+            writer.flush().unwrap();
+        }
+
+        let records = WalReader::new(Cursor::new(&buffer))
+            .unwrap()
+            .read_all()
+            .unwrap();
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0], WalRecord::Snapshot(snapshot.clone()));
+
+        // 解出来的快照必须能重建出逐体素一致的 Chunk。
+        let WalRecord::Snapshot(restored) = &records[0] else {
+            panic!("记录类型必须是 Snapshot");
+        };
+        let rebuilt = restored.to_chunk().unwrap();
+        assert_eq!(rebuilt.get(3, 4, 5), BlockId::new(7));
+        assert_eq!(rebuilt.get(31, 31, 31), BlockId::new(9));
+        assert_eq!(rebuilt.non_air_count(), chunk.non_air_count());
+    }
+
+    #[test]
+    fn a_corrupted_snapshot_frame_is_reported_not_panicking() {
+        let mut chunk = Chunk::new_empty(ChunkCoord::default());
+        chunk.set(1, 1, 1, BlockId::new(1)).unwrap();
+        let snapshot = ChunkSnapshot::from_chunk(&chunk);
+        let mut payload = snapshot.archive().unwrap().to_vec();
+        // 破坏负载中段：校验必须发现，而不是读出越界数据。
+        let length = payload.len();
+        for byte in payload.iter_mut().skip(length / 2).take(32) {
+            *byte = 0xAB;
+        }
+        match WalRecord::decode(KIND_SNAPSHOT, &payload) {
+            Err(PersistError::Malformed(_)) => {},
+            // 极少数改动恰好仍是合法归档：允许解码成功，但绝不允许 panic。
+            Ok(WalRecord::Snapshot(_)) => {},
+            other => panic!("损坏的快照帧只能报 Malformed 或解出合法快照，实际: {other:?}"),
+        }
     }
 }

@@ -41,7 +41,7 @@ impl core::fmt::Display for StorageError {
             Self::OutOfBounds { x, y, z } => write!(f, "体素坐标越界: ({x}, {y}, {z})"),
             Self::VolumeSizeMismatch { expected, actual } => {
                 write!(f, "体素缓冲长度不匹配：期望 {expected}，实际 {actual}")
-            }
+            },
             Self::PaletteOverflow { len } => write!(f, "调色板超出位宽上限: {len} 项"),
             Self::PoolFull { capacity } => write!(f, "Chunk 池已满（容量 {capacity}）"),
         }
@@ -166,7 +166,7 @@ impl Chunk {
         match (was_occupied, occupied) {
             (false, true) => self.non_air += 1,
             (true, false) => self.non_air -= 1,
-            _ => {}
+            _ => {},
         }
         self.dirty = true;
         self.version = self.version.wrapping_add(1);
@@ -201,6 +201,16 @@ impl Chunk {
     #[inline]
     pub fn version(&self) -> u32 {
         self.version
+    }
+
+    /// 还原版本号（用于从快照/存档恢复基准）。
+    ///
+    /// 版本号是差量同步的基准：从快照重建的 Chunk 必须拿回快照里记录的版本，
+    /// 否则带着旧 `base_version` 的差量会被 `DeltaTable::apply_all` 判为「基准已变」
+    /// 而整体跳过，看起来就像玩家改动凭空消失。
+    #[inline]
+    pub fn restore_version(&mut self, version: u32) {
+        self.version = version;
     }
 
     /// 调色板项数。

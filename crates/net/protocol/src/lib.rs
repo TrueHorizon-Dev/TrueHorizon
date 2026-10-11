@@ -1,27 +1,38 @@
-//! # protocol —— 网络协议 DTO
+//! # protocol —— 网络协议 DTO、线格式与传输接线
 //!
-//! 只放**数据定义**：带版本的客户端预测输入与服务端事件。不含传输、不含序列化实现、
-//! 不含任何引擎类型——因此这个 crate 可以被工具链、回放器、压测脚本独立复用。
+//! 分三层，互不渗透：
+//!
+//! * [`messages`]：**数据定义**（带版本的客户端预测输入与服务端事件）。不含传输、
+//!   不含引擎类型——因此这个 crate 可以被工具链、回放器、压测脚本独立复用；
+//! * [`codec`]：线格式编解码（手写小端、逐字段判界，解码路径按不可信输入对待）；
+//! * [`transport`]：`renet` 2.0 接线（通道语义、连接配置、netcode 传输构造）。
 //!
 //! 版本策略：
 //!
 //! * [`ProtocolVersion`] 只接受**完全相等**的版本（拒绝半兼容，避免出现难以复现的
 //!   状态分歧）；
 //! * 报文结构变更必须同时提升 [`PROTOCOL_VERSION`]，并在 `docs/` 记录变更点。
-//!
-//! 模块：
-//!
-//! * [`messages`]：全部报文与字段类型。
 
 #![deny(unsafe_op_in_unsafe_fn)]
 #![warn(missing_docs)]
 
+pub mod codec;
 pub mod messages;
+pub mod transport;
 
+pub use codec::{
+    decode_client, decode_server, encode_client, encode_server, fits_single_datagram,
+    ProtocolError, MAX_EDITS_PER_MESSAGE, MAX_NAME_BYTES, MAX_SNAPSHOT_ENTITIES,
+    MAX_SNAPSHOT_PLAYERS,
+};
 pub use messages::{
     BlockEdit, Buttons, ChunkDeltaMessage, ClientInput, ClientMessage, EntitySnapshot, PlayerState,
     ProtocolVersion, RejectReason, ServerMessage, ServerSnapshot, MAX_INPUT_RATE_HZ,
     MAX_PACKET_BYTES, PROTOCOL_VERSION,
+};
+pub use transport::{
+    bind_client, bind_server, current_time, ClientChannel, ServerChannel, TransportConfig,
+    TransportError, CHANNEL_MEMORY_BYTES, DEFAULT_BYTES_PER_TICK, DEFAULT_PROTOCOL_ID, RESEND_TIME,
 };
 
 #[cfg(test)]

@@ -8,25 +8,29 @@
 //! ```
 //!
 //! * [`delta`]：`ChunkDelta`（体素下标 + 方块，4 字节/条）与 `DeltaTable` 聚合。
+//! * [`snapshot`]：`ChunkSnapshot`（整块 32³ 体素，`rkyv` 0.8 归档、零拷贝可读）。
 //! * [`wal`]：长度前缀的写时复制日志，支持撕裂写检测与部分恢复。
 //!
 //! 崩溃恢复流程：
 //!
 //! 1. 用种子重新生成 Chunk 基准；
 //! 2. 顺序重放 WAL 中 `base_version` 匹配的差量（不匹配的记录直接跳过，见
-//!    `DeltaTable::apply_all`）；
+//!    `DeltaTable::apply_all`）；遇到 `Snapshot` 记录则用整块基准替换内存中的 Chunk
+//!    （压实后不必再逐条重放）；
 //! 3. 遇到 [`PersistError::Truncated`] 即停止——尾帧残缺是预期情况，不是故障。
 //!
-//! 尚未实现（路线图）：快照 + WAL 的压实（compaction）、每 Chunk 的增量快照、
+//! 尚未实现（路线图）：快照 + WAL 的自动压实（compaction）调度、每 Chunk 的增量快照、
 //! 校验和（CRC32C）与多副本原子切换。
 
 #![deny(unsafe_op_in_unsafe_fn)]
 #![warn(missing_docs)]
 
 pub mod delta;
+pub mod snapshot;
 pub mod wal;
 
 pub use delta::{ChunkDelta, DeltaTable, VoxelDelta, MAX_DELTA_EDITS};
+pub use snapshot::{archive_root_size, AlignedBytes, ChunkSnapshot};
 pub use wal::{WalReader, WalRecord, WalWriter, WAL_MAGIC};
 
 /// 持久化层错误。
@@ -81,7 +85,7 @@ impl PartialEq for PersistError {
         match (self, other) {
             (Self::Io(left), Self::Io(right)) => {
                 left.kind() == right.kind() && left.to_string() == right.to_string()
-            }
+            },
             (Self::BadMagic { found: left }, Self::BadMagic { found: right }) => left == right,
             (Self::Truncated, Self::Truncated) => true,
             (Self::UnknownRecordKind(left), Self::UnknownRecordKind(right)) => left == right,

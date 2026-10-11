@@ -10,8 +10,8 @@
 //!
 //! * `bake`：把种子烘焙成 Chunk 快照，并以 WAL 记录差量——供专用服务器预热或分发给客户端；
 //! * `migrate`：把旧 WAL 逐条读出、按当前格式重写（不认识的记录类型会明确报告并停下）；
-//! * `diagnose`：打印行星摘要、方块注册表校验与地层剖面抽样，用于排查
-//!   「地形看起来不对」这类问题的第一现场取证。
+//! * `diagnose`：打印行星摘要、方块注册表校验、地层剖面抽样与 RHI 环境探测，用于排查
+//!   「地形看起来不对」「这台机器为什么起不来 GPU 路径」这类问题的第一现场取证。
 
 use std::error::Error;
 use std::fs::File;
@@ -21,8 +21,9 @@ use std::time::Instant;
 
 use block_schema::{BlockDef, BlockId, BlockPhysics, BlockRegistry, Material, RenderClass};
 use geology::{GeologyBlocks, GeologyConfig, GeologyGenerator};
-use persistence::{ChunkDelta, WalReader, WalRecord, WalWriter};
+use persistence::{ChunkDelta, ChunkSnapshot, WalReader, WalRecord, WalWriter};
 use planet_coords::VoxelCoord;
+use rhi_vulkan::FeatureRequirements;
 use storage::Chunk;
 use streaming::generate_chunk;
 use world_contracts::{ChunkCoord, StratumSampler, CHUNK_VOLUME};
@@ -45,11 +46,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         "--help" | "-h" | "help" => {
             print_usage();
             Ok(())
-        }
+        },
         other => {
             print_usage();
             Err(format!("未知子命令: {other}").into())
-        }
+        },
     }
 }
 
@@ -86,7 +87,7 @@ impl Options {
                 "--seed" => options.seed = Some(value.parse().map_err(|_| "种子必须是 u64")?),
                 "--chunks" => {
                     options.chunks = Some(value.parse().map_err(|_| "chunks 必须是整数")?)
-                }
+                },
                 "--out" => options.out = Some(PathBuf::from(value)),
                 "--in" => options.input = Some(PathBuf::from(value)),
                 other => return Err(format!("未知参数: {other}")),
@@ -180,6 +181,7 @@ fn bake(options: &Options) -> Result<(), Box<dyn Error>> {
     let start = Instant::now();
     let mut written = 0u64;
     let mut solid_total = 0u64;
+    let mut last_chunk: Option<Chunk> = None;
 
     let file = BufWriter::new(File::create(&wal_path)?);
     let mut wal = WalWriter::new(file)?;
@@ -212,6 +214,27 @@ fn bake(options: &Options) -> Result<(), Box<dyn Error>> {
             chunk.packed_bytes() as f64 / 1024.0,
             edits
         );
+        last_chunk = Some(chunk);
+    }
+
+    // 压实锚点：整块 Chunk 快照以 rkyv 归档写入。
+    // 恢复端拿到这条记录即可零拷贝读出稠密基准，不必重放前面的全部差量。
+    if let Some(chunk) = &last_chunk {
+        let snapshot = ChunkSnapshot::from_chunk(chunk);
+        let archived_bytes = snapshot.archive()?.len();
+        let coord = snapshot.coord();
+        wal.append(&WalRecord::Snapshot(snapshot))?;
+        println!(
+            "[bake]   快照锚点 {} -> {} 体素，归档 {:.1} KiB（零拷贝可读）",
+            coord
+                .key()
+                .iter()
+                .map(i64::to_string)
+                .collect::<Vec<_>>()
+                .join(","),
+            ChunkSnapshot::BLOCK_COUNT,
+            archived_bytes as f64 / 1024.0
+        );
     }
     wal.append(&WalRecord::Checkpoint {
         tick: options.seed(),
@@ -240,18 +263,21 @@ fn migrate(options: &Options) -> Result<(), Box<dyn Error>> {
     let mut writer = WalWriter::new(BufWriter::new(File::create(&output)?))?;
     let mut deltas = 0u64;
     let mut checkpoints = 0u64;
+    let mut snapshots = 0u64;
     for record in &records {
         match record {
             WalRecord::Delta(_) => deltas += 1,
             WalRecord::Checkpoint { .. } => checkpoints += 1,
+            WalRecord::Snapshot(_) => snapshots += 1,
         }
         writer.append(record)?;
     }
     writer.flush()?;
     println!(
-        "[migrate] 完成：差量 {} 条，检查点 {} 条 -> {}",
+        "[migrate] 完成：差量 {} 条，检查点 {} 条，快照 {} 条 -> {}",
         deltas,
         checkpoints,
+        snapshots,
         output.display()
     );
     Ok(())
@@ -329,5 +355,50 @@ fn diagnose(options: &Options) -> Result<(), Box<dyn Error>> {
     println!(
         "[diagnose] 汇总：陆地 {land} / 海洋 {ocean} | 高程区间 [{lowest:+.0}, {highest:+.0}] m"
     );
+
+    diagnose_rhi();
     Ok(())
+}
+
+/// RHI 环境探测：这台机器到底能不能走 GPU 路径，以及差在哪个特性上。
+///
+/// 无 Vulkan 的 CI 会打印明确原因（而不是静默跳过），因此这条输出同时是
+/// 「图形层可用性」的回归证据。
+fn diagnose_rhi() {
+    let probe = rhi_vulkan::probe(&FeatureRequirements::minimum());
+    println!(
+        "[diagnose] Vulkan loader: {} | 实例: {} | 物理设备: {}",
+        match (&probe.loader_api_version, probe.loader_available) {
+            (Some(version), _) => format!("可用（{version}）"),
+            (None, true) => "可用（版本未知）".to_string(),
+            (None, false) => "不可用".to_string(),
+        },
+        if probe.instance_created {
+            "已创建"
+        } else {
+            "未创建"
+        },
+        probe.physical_devices
+    );
+    match &probe.device {
+        Some(info) => {
+            println!(
+                "[diagnose]   GPU: {} | Vulkan {} | 驱动 {:#x} | 显存 {:.1} GiB",
+                info.name,
+                info.api_version_string(),
+                info.driver_version,
+                info.vram_bytes as f64 / (1u64 << 30) as f64
+            );
+            let missing = info.missing_requirements(&FeatureRequirements::desktop_full());
+            println!(
+                "[diagnose]   桌面全特性缺失: {}",
+                if missing.is_empty() {
+                    "无（可走完整 GPU-Driven 路径）".to_string()
+                } else {
+                    missing.join(", ")
+                }
+            );
+        },
+        None => println!("[diagnose]   GPU: 无可用设备（{}）", probe.message),
+    }
 }
